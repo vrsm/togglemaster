@@ -1,0 +1,162 @@
+services:
+
+  auth-db:
+    image: postgres:16
+    container_name: auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db:/var/lib/postgresql/data
+      - ./auth-service-main/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  flag-db:
+    image: postgres:16
+    container_name: flag-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: flags_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - flag_db:/var/lib/postgresql/data
+      - ./flag-service-main/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  targeting-db:
+    image: postgres:16
+    container_name: targeting-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: targeting_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - targeting_db:/var/lib/postgresql/data
+      - ./targeting-service-main/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamodb
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+  localstack:
+    image: localstack/localstack:2.3.2
+    container_name: localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+      DEBUG: "0"
+      SQS_ENDPOINT_STRATEGY: path
+    ports:
+      - "4566:4566"
+
+  auth-service:
+    build:
+      context: ./auth-service-main
+    container_name: auth-service
+    restart: unless-stopped
+    depends_on:
+      - auth-db
+    ports:
+      - "8001:8001"
+    environment:
+      PORT: "8001"
+      DATABASE_URL: postgres://postgres:postgres@auth-db:5432/auth_db?sslmode=disable
+      MASTER_KEY: toggle-master
+
+  flag-service:
+    build:
+      context: ./flag-service-main
+    container_name: flag-service
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - flag-db
+    ports:
+      - "8002:8002"
+    environment:
+      PORT: "8002"
+      DATABASE_URL: postgres://postgres:postgres@flag-db:5432/flags_db?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8001
+
+  targeting-service:
+    build:
+      context: ./targeting-service-main
+    container_name: targeting-service
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - targeting-db
+    ports:
+      - "8003:8003"
+    environment:
+      PORT: "8003"
+      DATABASE_URL: postgres://postgres:postgres@targeting-db:5432/targeting_db?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8001
+
+  evaluation-service:
+    build:
+      context: ./evaluation-service-main
+    container_name: evaluation-service
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - flag-service
+      - targeting-service
+      - localstack
+    ports:
+      - "8004:8004"
+    environment:
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379
+      FLAG_SERVICE_URL: http://flag-service:8002
+      TARGETING_SERVICE_URL: http://targeting-service:8003
+      SERVICE_API_KEY: SUA_API_KEY
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_SQS_URL: http://localstack:4566/queue/us-east-1/000000000000/toggle-master
+
+  analytics-service:
+    build:
+      context: ./analytics-service-main
+    container_name: analytics-service
+    restart: unless-stopped
+    depends_on:
+      - dynamodb
+      - localstack
+    ports:
+      - "8005:8005"
+    environment:
+      PORT: "8005"
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_SQS_URL: http://localstack:4566/queue/us-east-1/000000000000/toggle-master
+      AWS_DYNAMODB_TABLE: toggle-master
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      SQS_ENDPOINT: http://localstack:4566
+
+volumes:
+  auth_db:
+  flag_db:
+  targeting_db:

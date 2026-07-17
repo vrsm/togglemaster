@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: togglemaster-config
+  namespace: togglemaster
+
+data:
+  AWS_REGION: "us-east-1"
+
+  AUTH_SERVICE_URL: "http://auth-service:8001"
+  FLAG_SERVICE_URL: "http://flag-service:8002"
+  TARGETING_SERVICE_URL: "http://targeting-service:8003"
+  EVALUATION_SERVICE_URL: "http://evaluation-service:8004"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:8005"
+
+  REDIS_URL: "redis://<ELASTICACHE_ENDPOINT>:6379"
+
+  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/523694734848/togglemaster"
+  AWS_DYNAMODB_TABLE: "ToggleMasterAnalytics"
+
+  AUTH_DATABASE_URL: "postgres://postgres:toggle-master@auth-service.ccr0ewmoayb5.us-east-1.rds.amazonaws.com:5432/auth_db?sslmode=require"
+
+  FLAG_DATABASE_URL: "postgres://postgres:toggle-master@flag-service.ccr0ewmoayb5.us-east-1.rds.amazonaws.com:5432/flags_db?sslmode=require"
+
+  TARGETING_DATABASE_URL: "postgres://postgres:toggle-master@targeting-service.ccr0ewmoayb5.us-east-1.rds.amazonaws.com:5432/targeting_db?sslmode=require"
