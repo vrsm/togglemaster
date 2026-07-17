@@ -486,7 +486,3 @@ analytics-service/
 - Horizontal Pod Autoscaler (HPA)
 
 ---
-
-# 📄 Licença
-
-Projeto desenvolvido para o **Tech Challenge - Pós-Tech FIAP**.
