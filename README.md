@@ -1,83 +1,173 @@
-#### Youtube ####
+# 🚀 ToggleMaster - Tech Challenge Fase 2
+
+Implementação de uma plataforma de **Feature Toggle** baseada em microsserviços utilizando **Docker Compose**, **Kubernetes (Amazon EKS)**, **Amazon SQS**, **Amazon DynamoDB**, **Redis** e **PostgreSQL**.
+
+---
+
+## 🎥 Demonstração
+
+**YouTube**
 
 https://youtu.be/hQbXcN8WGb0
 
-#################
+---
 
-﻿PARTE 1 - Docker Compose (Local)
+## 📦 Repositório
 
-1. Subir todo o ambiente
+**GitHub**
+
+https://github.com/vrsm/togglemaster
+
+---
+
+## 👨‍🎓 Aluno
+
+**Vinicius Matos**
+
+RM370385
+
+---
+
+# 📑 Sumário
+
+- Docker Compose
+- Testes dos Microsserviços
+- Kubernetes
+- Escalabilidade do Evaluation Service
+- Escalabilidade do Analytics Service
+- DynamoDB
+- Bancos de Dados
+- Desafios
+- Estrutura do Projeto
+
+---
+
+# 🐳 Parte 1 - Docker Compose (Ambiente Local)
+
+## Subir todo o ambiente
+
+```bash
 docker compose up -d
+```
 
-2. Verificar logs
+---
 
+## Verificar logs
+
+```bash
 docker compose logs --tail=20 | grep -Ei "stacktrace"
-Não pode haver stacktrace.
+```
 
-PARTE 2 - Testar microsserviços
+✅ Não deve existir nenhuma StackTrace.
 
-### Auth Service ###
+---
 
-1. Testar o health do endpoint
+# 🔐 Parte 2 - Testar Microsserviços
 
+# Auth Service
+
+## Health Check
+
+```bash
 curl http://localhost:8001/health
+```
 
-2. Criar API Key
+---
 
+## Criar API Key
+
+```bash
 curl -X POST http://localhost:8001/admin/keys \
 -H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b" \
 -H "Content-Type: application/json" \
 -d '{"name":"evaluation-service"}'
+```
 
-Obs: Alterar essa chave no docker compose e todos os tokens abaixo, e depois reiniciar apenas o container de evaluation com o comando abaixo:
+### Importante
 
+Após gerar uma nova chave:
+
+- Atualizar a chave no `docker-compose.yaml`
+- Atualizar todos os tokens utilizados
+- Reiniciar apenas o Evaluation Service
+
+```bash
 docker compose up -d --force-recreate evaluation-service
+```
 
-3. Validar API Key
+---
 
+## Validar API Key
+
+```bash
 curl http://localhost:8001/validate \
--H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b"
+-H "Authorization: Bearer SUA_API_KEY"
+```
 
+---
 
-### Flag Service ###
+# 🚩 Flag Service
 
-1. Testar o helath do endpoint
+## Health
+
+```bash
 curl http://localhost:8002/health
+```
 
-2. Criar flag
+---
 
+## Criar Flag
+
+```bash
 curl -X POST \
 http://localhost:8002/flags \
--H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b" \
+-H "Authorization: Bearer SUA_API_KEY" \
 -H "Content-Type: application/json" \
 -d '{
 "name":"nova-home",
 "description":"Nova Home",
 "is_enabled":true
 }'
+```
 
-3. Buscar flag
+---
 
+## Buscar Flag
+
+```bash
 curl \
 http://localhost:8002/flags/nova-home \
--H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b"
+-H "Authorization: Bearer SUA_API_KEY"
+```
 
-4. Verificar banco
+---
 
+## Validar PostgreSQL
+
+```bash
 docker exec -it flag-db psql -U postgres -d flags_db
+
 select * from flags;
+```
 
-### Targeting Service ###
+---
 
-1. Testar o health do endpoint 
+# 🎯 Targeting Service
 
+## Health
+
+```bash
 curl http://localhost:8003/health
+```
 
-2. Criar regra
+---
 
+## Criar Regra
+
+```bash
 curl -X POST \
 http://localhost:8003/rules \
--H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b" \
+-H "Authorization: Bearer SUA_API_KEY" \
 -H "Content-Type: application/json" \
 -d '{
 "flag_name":"nova-home",
@@ -86,181 +176,317 @@ http://localhost:8003/rules \
 "value":50
 }
 }'
+```
 
-3. Buscar regra
+---
 
+## Buscar Regra
+
+```bash
 curl \
 http://localhost:8003/rules/nova-home \
--H "Authorization: Bearer tm_key_14700ed377e62b253882073469888517a999a1a033a35074dade4519a0401d8b"
+-H "Authorization: Bearer SUA_API_KEY"
+```
 
-4. Verificar banco
+---
 
-docker exec -it targeting-db psql -U postgres -d targeting_db
+## Validar PostgreSQL
+
+```sql
 select * from targeting_rules;
+```
 
-### Evaluation Service ###
+---
 
-1. Testar o health do endpoint
+# ⚙ Evaluation Service
 
+## Health
+
+```bash
 curl http://localhost:8004/health
+```
 
-2. Avaliar flag
+---
 
+## Avaliar Flag
+
+```bash
 curl \
 "http://localhost:8004/evaluate?user_id=user123&flag_name=nova-home"
+```
 
-3. Testar cache Redis
+---
 
-1) Abrir os logs do Evaluation Service
+## Testar Cache Redis
+
+Abrir logs
+
+```bash
 docker compose logs -f evaluation-service
-2) Limpar completamente o Redis
+```
+
+Limpar cache
+
+```bash
 docker exec -it redis redis-cli FLUSHALL
-3) Primeira chamada
+```
+
+Executar duas vezes:
+
+```bash
 curl "http://localhost:8004/evaluate?user_id=user123&flag_name=nova-home"
-4) Segunda chamada (mesma URL)
-curl "http://localhost:8004/evaluate?user_id=user123&flag_name=nova-home"
+```
 
-### Analytics Service ###
+---
 
-1. Testar o health do endpoint
+# 📊 Analytics Service
 
+## Health
+
+```bash
 curl http://localhost:8005/health
+```
 
-2. Mostrar worker
+---
 
+## Worker
+
+```bash
 docker compose logs analytics-service -f
+```
 
-3. Fazer avaliação
+---
 
+## Gerar evento
+
+```bash
 curl \
 "http://localhost:8004/evaluate?user_id=user123&flag_name=nova-home"
+```
 
-4. Mostrar mensagem chegando
+---
 
-5. Mostrar DynamoDB
+## Consultar DynamoDB Local
 
+```bash
 aws dynamodb scan \
 --table-name toggle-master \
 --endpoint-url http://localhost:8000
+```
 
-PARTE 3 - Kubernetes
+---
 
-1. Mostrar cluster
+# ☸ Parte 3 - Kubernetes
 
+## Cluster
+
+```bash
 kubectl get nodes
+```
 
-2. Mostrar Deployments
+## Deployments
 
+```bash
 kubectl get deploy -A
+```
 
-3. Mostrar Pods
+## Pods
 
+```bash
 kubectl get pods -n togglemaster
+```
 
-4. Mostrar Services
+## Services
 
+```bash
 kubectl get svc -n togglemaster
+```
 
-5. Mostrar Ingress
+## Ingress
 
+```bash
 kubectl get ingress -n togglemaster
+```
+
 ou
+
+```bash
 kubectl get svc ingress-nginx-controller -n ingress-nginx
+```
 
-6. Chamada pública
+---
 
-curl http://LOADBALANCER/evaluate?user_id=user123&flag_name=nova-home
+## Teste Público
 
-PARTE 4 - Escalabilidade Evaluation
+```bash
+curl \
+http://LOAD_BALANCER/evaluate?user_id=user123&flag_name=nova-home
+```
 
-1. Exibir processamento HPA
+---
 
+# 📈 Parte 4 - Escalabilidade do Evaluation Service
+
+## Exibir HPA
+
+```bash
 kubectl get hpa -n togglemaster
+```
 
-2. Gerar carga
+---
 
+## Gerar carga
+
+```bash
 hey -z 2m -c 100 \
-http://LOADBALANCER/evaluate?user_id=user123&flag_name=nova-home
+http://LOAD_BALANCER/evaluate?user_id=user123&flag_name=nova-home
+```
 
-3. Em outro terminal
+---
 
+## Monitorar HPA
+
+```bash
 watch kubectl get hpa -n togglemaster
+```
 
-4. Exibir todos os pods no namespace togglemaster
+---
 
+## Monitorar Pods
+
+```bash
 watch kubectl get pods -n togglemaster
+```
 
-PARTE 5 - Escalabilidade Analytics
+---
 
-1. Enviar várias mensagens
+# 📊 Parte 5 - Escalabilidade do Analytics Service
 
-Pode ser via script
+## Enviar mensagens para a SQS
 
-for i in {1..200}
-do
-curl ...
-done
-ou AWS CLI
-aws sqs send-message ...
+Pode ser por script ou AWS CLI.
 
-2. Exibir o processamento do HPA
+---
 
+## Monitorar HPA
+
+```bash
 kubectl get hpa
+```
 
-3. Exibir todos os pods e o aumento do Analytics.
+---
 
+## Monitorar Pods
+
+```bash
 kubectl get pods
+```
 
-PARTE 6 - DynamoDB
+---
 
-1. Exibir os eventos 
+# 🗄 Parte 6 - DynamoDB
 
+Consultar eventos
+
+```bash
 aws dynamodb scan \
 --table-name toggle-master
-Mostrar novos eventos.
+```
 
-PARTE 7 - Bancos
+---
 
-1. Mostrar rapidamente
+# 💾 Parte 7 - Bancos
 
-### Auth ###
+## Auth
 
+```sql
 select * from api_keys;
+```
 
-### Flag ###
+---
 
+## Flag
+
+```sql
 select * from flags;
+```
 
-### Targeting ###
+---
 
+## Targeting
+
+```sql
 select * from targeting_rules;
+```
 
-### Redis ###
+---
 
+## Redis
+
+```text
 keys *
+```
 
-### DynamoDB ###
+---
 
+## DynamoDB
+
+```text
 scan
+```
 
-PARTE 8 - Desafios
+---
 
-Comentar:
-    • IAM Role do Lab. 
-    • Secrets do Kubernetes. 
-    • Integração entre microsserviços. 
-    • Configuração do HPA. 
-    • Problemas de autenticação entre Evaluation e Auth. 
-    • Permissões do DynamoDB. 
-    • Diferença entre ambiente local (Docker Compose) e ambiente AWS (EKS). 
+# ⚠ Parte 8 - Desafios
 
-PARTE 9 - Mostrar os repositórios
-Abrir o GitHub.
-Mostrar:
-    • docker-compose.yaml 
-    • k8s/ 
-    • auth-service 
-    • flag-service 
-    • targeting-service 
-    • evaluation-service 
-    • analytics-service 
+Durante o desenvolvimento foram enfrentados desafios relacionados a:
+
+- Integração entre microsserviços
+- IAM Role da AWS Academy
+- Secrets no Kubernetes
+- Configuração do HPA
+- Autenticação entre Evaluation e Auth
+- Permissões do DynamoDB
+- Diferenças entre Docker Compose e Amazon EKS
+
+---
+
+# 📂 Parte 9 - Estrutura do Projeto
+
+```
+docker-compose.yaml
+
+k8s/
+
+auth-service/
+
+flag-service/
+
+targeting-service/
+
+evaluation-service/
+
+analytics-service/
+```
+
+---
+
+# 🛠 Tecnologias Utilizadas
+
+- Docker Compose
+- Kubernetes
+- Amazon EKS
+- Amazon SQS
+- Amazon DynamoDB
+- PostgreSQL
+- Redis
+- Python
+- Flask
+- NGINX Ingress
+- Horizontal Pod Autoscaler (HPA)
+
+---
+
+# 📄 Licença
+
+Projeto desenvolvido para o **Tech Challenge - Pós-Tech FIAP**.
